@@ -30,6 +30,9 @@
   (path-value [this type path]
               [this type path default]))
 
+(defprotocol PathErrors
+  (path-errors [this path]))
+
 (defprotocol CoercedValue
   (str-value [this])
   (set-str-value! [this val]))
@@ -43,7 +46,8 @@
 (defprotocol Validator
   (validate [this value]))
 
-Validator by mohol vracat nejaky Errors kde bude povedane ci je ok a path
+
+;Validator by mohol vracat nejaky Errors kde bude povedane ci je ok a path
 
 (defprotocol Touchable
   (touch [this])
@@ -102,7 +106,7 @@ Validator by mohol vracat nejaky Errors kde bude povedane ci je ok a path
   ErrorContainer
   (errors [this]
     (reaction (->> (concat @(path-value form ::field-errors path nil)
-                           [@(path-value form ::validator-errors path)])
+                           @(path-errors form path))
                    (remove empty?))))
   Validatable
   (valid? [this]
@@ -140,25 +144,33 @@ Validator by mohol vracat nejaky Errors kde bude povedane ci je ok a path
 
 
 (defn- validate-form
-  ([f]
+  ([validator f]
    (fn [value & args]
-     (validate-form value f args)))
-  ([value f & args]
-   (let [validator (::validator value)
-         new-value (apply f value args)]
+     (validate-form value validator f args)))
+  ([value validator f & args]
+   (let [new-value (apply f value args)]
      (-> new-value
          (assoc ::validator-errors (validator (::value new-value)))))))
 
-(defrecord Form [value]
+(extend-type nil
+  Validatable
+  (valid? [this]
+    true)
+
+  PathErrors
+  (path-errors [this path]
+    []))
+
+(defrecord Form [value validator]
   ISwap
   (-swap! [o f]
-    (swap! value validate-form f))
+    (swap! value validate-form validator f))
   (-swap! [o f a]
-    (swap! value validate-form f a))
+    (swap! value validate-form validator f a))
   (-swap! [o f a b]
-    (swap! value validate-form f a b))
+    (swap! value validate-form validator f a b))
   (-swap! [o f a b xs]
-    (apply swap! value validate-form f a b xs))
+    (apply swap! value validate-form validator f a b xs))
 
   Value
   (value [this]
@@ -175,14 +187,17 @@ Validator by mohol vracat nejaky Errors kde bude povedane ci je ok a path
   (reset-value! [this]
     (swap! value (fn [value]
                    {::value    (::original value)
-                    ::original (::original value)}
-                   ::validator (::validator value))))
+                    ::original (::original value)})))
 
   PathValue
   (path-value [_ type path]
     (path-value _ type path nil))
   (path-value [_ type path default]
     (reaction (get-in @value (field-path type path) default)))
+
+  PathErrors
+  (path-errors [_ path]
+    (reaction (path-errors (::validator-errors @value) path)))
 
   Validatable
   (valid? [_]
@@ -191,25 +206,35 @@ Validator by mohol vracat nejaky Errors kde bude povedane ci je ok a path
                      vals
                      (remove empty?)
                      empty?)
-                (empty? (::validator-errors @value))))))
+                (valid? (::validator-errors @value))))))
 
 (defn field [form type path]
   (->Field form (coercer type) (reify Validator
                                  (validate [_ value] [])) path))
 
+(deftype ValidationResult [errors]
+  PathErrors
+  (path-errors [this path]
+    (remove nil? [(get-in errors path)]))
+
+  Validatable
+  (valid? [this]
+    (empty? errors)))
+
 (defn create-form [value validator]
-  (->Form (reagent/atom {::value     value
-                         ::original  value
-                         ::validator #(-> %
-                                          (st/validate validator)
-                                          first)})))
+  (->Form (reagent/atom {::value    value
+                         ::original value
+                         })
+          #(->ValidationResult (-> %
+                                 (st/validate validator)
+                                 first))))
 
 (defn handle-str-value [field]
   #(set-str-value! field (-> % .-target .-value)))
 
 (defcard first-card
-  (sab/html [:div
-             [:h1 "This is your first devcard!"]]))
+         (sab/html [:div
+                    [:h1 "This is your first devcard!"]]))
 
 
 (defn my-field [type field]
@@ -226,33 +251,33 @@ Validator by mohol vracat nejaky Errors kde bude povedane ci je ok a path
        ^{:key i} [:li message])]))
 
 (defcard-rg rg-form
-  (fn [state]
-    (let [form      (create-form
-                      @state
-                      {:field     [st/required st/string]
-                       :int-field [st/required st/integer]})
-          int-field (field form :int [:int-field])]
-      (fn [state]
-        [:form {:on-submit #(do
-                             (prn "submit" @(value form {}) @state)
-                             (reset! state @(value form {}))
-                             (.preventDefault %))}
-         [:div "Valid?:" (if @(valid? form) "T" "F")]
-         [my-field "text" (field form :text [:field])]
-         [my-field "text" (field form :int [:int-field])]
-         [:select
-          {:value     @(str-value int-field)
-           :on-change (handle-str-value int-field)}
-          [:option {:value 1} "1"]
-          [:option {:value 2} "2"]]
-         [:input {:type "submit"}]
-         (.log js/console @(valid? form) (clj->js @(:value form)))
-         ])))
-  {:field     "value"
-   :int-field 1}
+            (fn [state]
+              (let [form      (create-form
+                                @state
+                                {:field     [st/required st/string]
+                                 :int-field [st/required st/integer]})
+                    int-field (field form :int [:int-field])]
+                (fn [state]
+                  [:form {:on-submit #(do
+                                       (prn "submit" @(value form {}) @state)
+                                       (reset! state @(value form {}))
+                                       (.preventDefault %))}
+                   [:div "Valid?:" (if @(valid? form) "T" "F")]
+                   [my-field "text" (field form :text [:field])]
+                   [my-field "text" (field form :int [:int-field])]
+                   [:select
+                    {:value     @(str-value int-field)
+                     :on-change (handle-str-value int-field)}
+                    [:option {:value 1} "1"]
+                    [:option {:value 2} "2"]]
+                   [:input {:type "submit"}]
+                   (.log js/console @(valid? form) (clj->js @(:value form)))
+                   ])))
+            {:field     "value"
+             :int-field 1}
 
-  {:inspect-data true}
-  )
+            {:inspect-data true}
+            )
 
 (defn main []
   ;; conditionally start the app based on whether the #main-app-area
