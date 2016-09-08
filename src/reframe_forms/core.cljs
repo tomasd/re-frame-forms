@@ -1,18 +1,10 @@
 (ns reframe-forms.core
   (:require
-    #_[om.core :as om :include-macros true]
-    [sablono.core :as sab :include-macros true]
+    [clojure.string :as str]
     [reagent.core :as reagent]
-    [struct.core :as st]
-    [cuerdas.core :as str])
+    )
   (:require-macros
-    [devcards.core :as dc :refer [defcard deftest defcard-rg]]
-    [reagent.ratom :refer [reaction]]
-    [cljs.test :refer [testing is]]
-    ))
-
-(enable-console-print!)
-
+    [reagent.ratom :refer [reaction]]))
 
 (defprotocol Value
   (value [this]
@@ -25,7 +17,8 @@
 
 (defprotocol Coercer
   (to-str [this obj-value])
-  (from-str [this str-value]))
+  (from-str [this str-value])
+  (valid-str? [this str-value]))
 
 (defprotocol PathValue
   (path-value [this type path]
@@ -130,15 +123,26 @@
         Validator
         (validate [_ s])))
 
+(deftype IntCoercer [allow-blank?]
+  Coercer
+  (to-str [_ obj] (str obj))
+  (from-str [_ s] (if (str/blank? s) nil (js/parseInt s)))
+  (valid-str? [_ s]
+    (or (and allow-blank? (str/blank? s))
+        (re-matches #"(\+|\-)?\d+" s))))
+
 (defmethod coercer :int
   [_] (reify
         Coercer
         (to-str [_ obj] (str obj))
-        (from-str [_ s] (if (str/empty? s) nil (js/parseInt s)))
+        (from-str [_ s] (if (str/blank? s) nil (js/parseInt s)))
+        (valid-str? [_ s]
+          (or (str/blank? s)
+              (re-matches #"(\+|\-)?\d+" s)))
 
         Validator
         (validate [_ s]
-          (if (or (str/empty? s) (re-matches #"(\+|\-)?\d+" s))
+          (if (or (str/blank? s) (re-matches #"(\+|\-)?\d+" s))
             []
             ["Neplatné číslo"]
             ))))
@@ -228,13 +232,9 @@
   (valid? [this]
     (empty? errors)))
 
-(deftype StructValidator [schema]
-  Validator
-  (validate [this value]
-    (->ValidationResult (-> (st/validate value schema)
-                            first))))
-(defn struct-validator [schema]
-  (->StructValidator schema))
+(defn validation-result [result]
+  (->ValidationResult result))
+
 
 (defn create-form
   ([value]
@@ -248,105 +248,12 @@
 (defn handle-str-value [field]
   #(set-str-value! field (-> % .-target .-value)))
 
-(defcard first-card
-         (sab/html [:div
-                    [:h1 "This is your first devcard!"]]))
 
 
-(defn my-field [type field]
-  (fn [type field]
-    [:div
-     [:input {:type      type
-              :value     @(str-value field)
-              :on-change (handle-str-value field)}]
-     [:button {:type     "button"
-               :on-click #(reset-value! field)} "Reset"]
-     [:span (original-value field)]
-     (when @(touched? field) "touched")
-     (for [[i message] (map-indexed vector @(errors field))]
-       ^{:key i} [:li message])]))
-
-(deftest test-form
-  (testing "form without validator"
-    (testing "display"
-      (let [form       (create-form {:field     "value"
-                                     :int-field 1})
-            text-field (field form :text [:field])
-            int-field  (field form :int [:int-field])]
-        (is (= @(value form nil) {:field     "value"
-                                  :int-field 1}))
-        (is (= @(value text-field) "value"))
-        (is (= @(str-value text-field) "value"))
-        (is @(valid? text-field))
-
-        (is (= @(value int-field) 1))
-        (is (= @(str-value int-field) "1"))
-        (is @(valid? int-field))))
 
 
-    (testing "change"
-      (let [form  (create-form {:field "value"
-                                :int-field 1})
-            text-field (field form :text [:field])
-            int-field (field form :int [:int-field])
-            ]
-        (set-str-value! text-field "changed")
-        (is (= @(value text-field) "changed"))
-        (is @(valid? text-field))
-
-        (set-str-value! int-field "invalid")
-        (is (= @(value int-field) nil))
-        (is (= @(str-value int-field ) "invalid"))
-        (is (not @(valid? int-field)))
-        )))
-
-  (testing "form with validator, int in range <1;2>"
-    (let [form (create-form {:value 1} (struct-validator {:value [[st/in-range 1 2]]}))
-          int-field (field form :int [:value])]
-      (is @(valid? int-field) "1 is in range <1;2")
 
 
-      (set-str-value! int-field "2")
-      (is @(valid? int-field) "2 is in range <1;2>")
 
 
-      (set-str-value! int-field "3")
-      (is (not @(valid? int-field)) "3 is not in range <1;2>"))))
-
-(defcard-rg rg-form
-            (fn [state]
-              (let [form      (create-form
-                                @state
-                                (struct-validator {:field     [st/required st/string]
-                                                   :int-field [st/required st/integer]}))
-                    int-field (field form :int [:int-field])]
-                (fn [state]
-                  [:form {:on-submit #(do (reset! state @(value form {}))
-                                          (.preventDefault %))}
-                   [:div "Valid?:" (if @(valid? form) "T" "F")]
-                   [my-field "text" (field form :text [:field])]
-                   [my-field "text" (field form :int [:int-field])]
-                   [:select
-                    {:value     @(str-value int-field)
-                     :on-change (handle-str-value int-field)}
-                    [:option {:value 1} "1"]
-                    [:option {:value 2} "2"]]
-                   [:input {:type "submit"}]
-                   ])))
-            {:field     "value"
-             :int-field 1}
-
-            {:inspect-data true}
-            )
-
-(defn main []
-  ;; conditionally start the app based on whether the #main-app-area
-  ;; node is on the page
-  (if-let [node (.getElementById js/document "main-app-area")]
-    (js/React.render (sab/html [:div "This is working"]) node)))
-
-(main)
-
-;; remember to run lein figwheel and then browse to
-;; http://localhost:3449/cards.html
 
