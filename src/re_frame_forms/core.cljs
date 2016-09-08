@@ -1,4 +1,4 @@
-(ns reframe-forms.core
+(ns re-frame-forms.core
   (:require
     [clojure.string :as str]
     [reagent.core :as reagent]

@@ -1,6 +1,6 @@
-(ns reframe-forms.input
+(ns re-frame-forms.input
   (:require
-    [reframe-forms.core :as form]))
+    [re-frame-forms.core :as form]))
 
 (defn radio
   ([field value]

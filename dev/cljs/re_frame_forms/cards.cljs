@@ -1,9 +1,9 @@
-(ns reframe-forms.cards
+(ns re-frame-forms.cards
   (:require
     #_[om.core :as om :include-macros true]
 
-    [reframe-forms.core :as form]
-    [reframe-forms.input :as input]
+    [re-frame-forms.core :as form]
+    [re-frame-forms.input :as input]
     [reagent.core :as reagent]
     [struct.core :as st]
     [cuerdas.core :as str])
