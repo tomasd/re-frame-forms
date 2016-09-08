@@ -11,6 +11,11 @@
          [this default])
   (set-value! [this val]))
 
+(defprotocol PersistentError
+  (set-error! [this error]))
+(defn clear-error! [this]
+  (set-error! this nil))
+
 (defprotocol ResetValue
   (original-value [this])
   (reset-value! [this]))
@@ -40,9 +45,6 @@
 (defprotocol Validator
   (validate [this value]))
 
-
-;Validator by mohol vracat nejaky Errors kde bude povedane ci je ok a path
-
 (defprotocol Touchable
   (touch [this])
   (touched? [this]))
@@ -67,9 +69,10 @@
   (set-value! [_ val]
     (swap! form assoc-field path
            ::field-errors (validate validator val)
+           ::coercion-error false
            ::value val
            ::tmp nil
-           ::touched true))
+           ::field-touched true))
 
   ResetValue
   (original-value [this]
@@ -77,48 +80,66 @@
   (reset-value! [this]
     (swap! form assoc-field path
            ::field-errors []
+           ::coercion-error false
            ::value (original-value this)
            ::tmp nil
-           ::touched false))
+           ::field-touched false))
 
   CoercedValue
   (str-value [this]
-    (reaction (or @(path-value form ::tmp path nil)
-                  (->> @(value this)
-                       (to-str coercer)))))
+    (reaction
+      (let [str-value @(path-value form ::tmp path nil)
+            value     @(value this)]
+        (or str-value (to-str coercer value)))))
   (set-str-value! [this val]
-    (let [errors (validate coercer val)]
-      (if (empty? errors)
-        (->> (from-str coercer val)
-             (set-value! this))
+    (if (valid-str? coercer val)
+      (->> (from-str coercer val)
+           (set-value! this))
+      (let [errors (if (instance? Validator coercer)
+                     (validate coercer errors)
+                     [])]
         (swap! form assoc-field path
                ::field-errors errors
+               ::coercion-error true
                ::value nil
                ::tmp val
-               ::touched true))))
+               ::field-touched true))))
 
   ErrorContainer
   (errors [this]
     (reaction (->> (concat @(path-value form ::field-errors path nil)
-                           @(path-errors form path))
-                   (remove empty?))))
+                           @(path-errors form path)
+                           [@(path-value form ::persistent-error path nil)])
+                   (remove empty?)
+                   (remove nil?))))
+
+  PersistentError
+  (set-error! [_ error]
+    (swap! form assoc-field path ::persistent-error error))
+
   Validatable
   (valid? [this]
-    (reaction (empty? @(errors this))))
+    (reaction (and (not @(path-value form ::coercion-error path false))
+                   (empty? @(errors this)))))
 
   Touchable
   (touch [this]
     (swap! form assoc-field path
-           ::touched true))
+           ::field-touched true))
   (touched? [_]
-    (reaction @(path-value form ::touched path false))))
+    (reaction
+      (let [form-touched @(touched? form)
+            path-touched @(path-value form ::field-touched path false)]
+        (or form-touched path-touched)))))
 
-(defmulti coercer identity)
-(defmethod coercer :default
+
+(defmulti create-coercer identity)
+(defmethod create-coercer :default
   [_] (reify
         Coercer
         (to-str [_ obj] (str obj))
         (from-str [_ s] s)
+        (valid-str? [_ _] true)
 
         Validator
         (validate [_ s])))
@@ -128,24 +149,29 @@
   (to-str [_ obj] (str obj))
   (from-str [_ s] (if (str/blank? s) nil (js/parseInt s)))
   (valid-str? [_ s]
-    (or (and allow-blank? (str/blank? s))
-        (re-matches #"(\+|\-)?\d+" s))))
+    (boolean (or (and allow-blank? (str/blank? s))
+                 (re-matches #"(\+|\-)?\d+" s)))))
 
-(defmethod coercer :int
-  [_] (reify
-        Coercer
-        (to-str [_ obj] (str obj))
-        (from-str [_ s] (if (str/blank? s) nil (js/parseInt s)))
-        (valid-str? [_ s]
-          (or (str/blank? s)
-              (re-matches #"(\+|\-)?\d+" s)))
+(deftype BoolCoercer [blank-as-false?]
+  Coercer
+  (to-str [_ obj] (str obj))
+  (from-str [_ s] (if (and blank-as-false? (str/blank? s))
+                    false
+                    (boolean s)))
+  (valid-str? [_ s] true))
 
-        Validator
-        (validate [_ s]
-          (if (or (str/blank? s) (re-matches #"(\+|\-)?\d+" s))
-            []
-            ["Neplatné číslo"]
-            ))))
+(deftype KeywordCoercer []
+  Coercer
+  (to-str [_ obj] (name obj))
+  (from-str [_ s] (keyword s))
+  (valid-str? [_ s] (not (str/blank? s))))
+
+(defmethod create-coercer :int
+  [_] (->IntCoercer true))
+(defmethod create-coercer :keyword
+  [_] (->KeywordCoercer))
+(defmethod create-coercer :bool
+  [_] (->BoolCoercer true))
 
 
 (defn- validate-form
@@ -156,6 +182,17 @@
    (let [new-value (apply f value args)]
      (-> new-value
          (assoc ::validator-errors (validate validator (::value new-value)))))))
+
+(def ->coercer (memoize create-coercer))
+
+(extend-type Keyword
+  Coercer
+  (to-str [this obj-value]
+    (to-str (->coercer this) obj-value))
+  (from-str [this str-value]
+    (from-str (->coercer this) str-value))
+  (valid-str? [this str-value]
+    (valid-str? (->coercer this) str-value)))
 
 (extend-type nil
   Validator
@@ -168,7 +205,12 @@
 
   PathErrors
   (path-errors [this path]
-    []))
+    [])
+
+  Coercer
+  (to-str [_ obj] (str obj))
+  (from-str [_ s] s)
+  (valid-str? [_ _] true))
 
 (defrecord Form [value validator]
   ISwap
@@ -211,15 +253,29 @@
   Validatable
   (valid? [_]
     (reaction (and
-                (->> (::field-errors @value)
+                (->> (concat (::field-errors @value)
+                             (::persistent-error @value))
                      vals
                      (remove empty?)
                      empty?)
-                (valid? (::validator-errors @value))))))
+                (valid? (::validator-errors @value)))))
 
-(defn field [form type path]
-  (->Field form (coercer type) (reify Validator
-                                 (validate [_ value] [])) path))
+  Touchable
+  (touch [this]
+    (swap! value assoc ::form-touched true))
+  (touched? [this]
+    (reaction (::form-touched @value false))))
+
+(defn field
+  ([form path]
+   (field form path nil nil))
+  ([form path type]
+   (field form path type nil))
+  ([form path type validator]
+   (let [coercer (if (instance? Coercer type)
+                   type
+                   (create-coercer type))]
+     (->Field form coercer validator path))))
 
 
 
@@ -247,6 +303,17 @@
 
 (defn handle-str-value [field]
   #(set-str-value! field (-> % .-target .-value)))
+
+(defn handle-checked-value [field]
+  #(set-value! field (-> % .-target .-checked)))
+
+(defn handle-valid-form [form callback]
+  (fn [e]
+    (touch form)
+    (when @(valid? form)
+      (callback @(value form)))
+    (.preventDefault e)))
+
 
 
 

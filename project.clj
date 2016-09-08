@@ -13,7 +13,10 @@
                  [reagent "0.6.0-rc"]]
 
   :profiles {:dev {:dependencies [[devcards "0.2.1-7"]
-                                  [funcool/struct "1.0.0"]]}}
+                                  [funcool/struct "1.0.0"]]
+
+
+                   }}
 
   :plugins [[lein-figwheel "0.5.3-2"]
             [lein-cljsbuild "1.1.3" :exclusions [org.clojure/clojure]]]
