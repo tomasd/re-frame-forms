@@ -8,6 +8,7 @@
   (:require-macros
     [devcards.core :as dc :refer [defcard deftest defcard-rg]]
     [reagent.ratom :refer [reaction]]
+    [cljs.test :refer [testing is]]
     ))
 
 (enable-console-print!)
@@ -150,9 +151,13 @@
   ([value validator f & args]
    (let [new-value (apply f value args)]
      (-> new-value
-         (assoc ::validator-errors (validator (::value new-value)))))))
+         (assoc ::validator-errors (validate validator (::value new-value)))))))
 
 (extend-type nil
+  Validator
+  (validate [this value]
+    nil)
+
   Validatable
   (valid? [this]
     true)
@@ -174,8 +179,8 @@
 
   Value
   (value [this]
-    (value this nil))
-  (value [_ default]
+    (reaction (get @value ::value)))
+  (value [this default]
     (reaction (get @value ::value default)))
   (set-value! [this val]
     (swap! value
@@ -212,6 +217,8 @@
   (->Field form (coercer type) (reify Validator
                                  (validate [_ value] [])) path))
 
+
+
 (deftype ValidationResult [errors]
   PathErrors
   (path-errors [this path]
@@ -221,13 +228,22 @@
   (valid? [this]
     (empty? errors)))
 
-(defn create-form [value validator]
-  (->Form (reagent/atom {::value    value
-                         ::original value
-                         })
-          #(->ValidationResult (-> %
-                                 (st/validate validator)
-                                 first))))
+(deftype StructValidator [schema]
+  Validator
+  (validate [this value]
+    (->ValidationResult (-> (st/validate value schema)
+                            first))))
+(defn struct-validator [schema]
+  (->StructValidator schema))
+
+(defn create-form
+  ([value]
+   (create-form value nil))
+  ([value validator]
+   (->Form (reagent/atom {::value    value
+                          ::original value
+                          })
+           validator)))
 
 (defn handle-str-value [field]
   #(set-str-value! field (-> % .-target .-value)))
@@ -250,18 +266,63 @@
      (for [[i message] (map-indexed vector @(errors field))]
        ^{:key i} [:li message])]))
 
+(deftest test-form
+  (testing "form without validator"
+    (testing "display"
+      (let [form       (create-form {:field     "value"
+                                     :int-field 1})
+            text-field (field form :text [:field])
+            int-field  (field form :int [:int-field])]
+        (is (= @(value form nil) {:field     "value"
+                                  :int-field 1}))
+        (is (= @(value text-field) "value"))
+        (is (= @(str-value text-field) "value"))
+        (is @(valid? text-field))
+
+        (is (= @(value int-field) 1))
+        (is (= @(str-value int-field) "1"))
+        (is @(valid? int-field))))
+
+
+    (testing "change"
+      (let [form  (create-form {:field "value"
+                                :int-field 1})
+            text-field (field form :text [:field])
+            int-field (field form :int [:int-field])
+            ]
+        (set-str-value! text-field "changed")
+        (is (= @(value text-field) "changed"))
+        (is @(valid? text-field))
+
+        (set-str-value! int-field "invalid")
+        (is (= @(value int-field) nil))
+        (is (= @(str-value int-field ) "invalid"))
+        (is (not @(valid? int-field)))
+        )))
+
+  (testing "form with validator, int in range <1;2>"
+    (let [form (create-form {:value 1} (struct-validator {:value [[st/in-range 1 2]]}))
+          int-field (field form :int [:value])]
+      (is @(valid? int-field) "1 is in range <1;2")
+
+
+      (set-str-value! int-field "2")
+      (is @(valid? int-field) "2 is in range <1;2>")
+
+
+      (set-str-value! int-field "3")
+      (is (not @(valid? int-field)) "3 is not in range <1;2>"))))
+
 (defcard-rg rg-form
             (fn [state]
               (let [form      (create-form
                                 @state
-                                {:field     [st/required st/string]
-                                 :int-field [st/required st/integer]})
+                                (struct-validator {:field     [st/required st/string]
+                                                   :int-field [st/required st/integer]}))
                     int-field (field form :int [:int-field])]
                 (fn [state]
-                  [:form {:on-submit #(do
-                                       (prn "submit" @(value form {}) @state)
-                                       (reset! state @(value form {}))
-                                       (.preventDefault %))}
+                  [:form {:on-submit #(do (reset! state @(value form {}))
+                                          (.preventDefault %))}
                    [:div "Valid?:" (if @(valid? form) "T" "F")]
                    [my-field "text" (field form :text [:field])]
                    [my-field "text" (field form :int [:int-field])]
@@ -271,7 +332,6 @@
                     [:option {:value 1} "1"]
                     [:option {:value 2} "2"]]
                    [:input {:type "submit"}]
-                   (.log js/console @(valid? form) (clj->js @(:value form)))
                    ])))
             {:field     "value"
              :int-field 1}
