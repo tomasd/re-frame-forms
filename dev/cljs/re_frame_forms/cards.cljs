@@ -4,6 +4,9 @@
 
     [re-frame-forms.core :as form]
     [re-frame-forms.input :as input]
+    [re-frame-forms.coerce :as coerce]
+    [re-frame-forms.handler :as handler]
+    [re-frame-forms.validation :as validation]
     [reagent.core :as reagent]
     [struct.core :as st]
     [cuerdas.core :as str])
@@ -15,21 +18,16 @@
 
 (enable-console-print!)
 
-(deftype StructValidator [schema]
-  form/Validator
-  (validate [this value]
-    (form/validation-result
-      (-> (st/validate value schema)
-          first))))
 (defn struct-validator [schema]
-  (->StructValidator schema))
-
-
+  (validation/form-validator #(validation/validation-result
+                    (-> (st/validate % schema)
+                        first))))
 
 (defn my-field [type field]
   (fn [type field]
     [:div
-     [input/input field type {:style (if-not @(form/valid? field) {:border "1px solid red"})}]
+     [input/input field {:type  type
+                         :style (if-not @(form/valid? field) {:border "1px solid red"})}]
      [:button {:type     "button"
                :on-click #(form/reset-value! field)} "Reset"]
      [:span (form/original-value field)]
@@ -45,6 +43,43 @@
 (defn my-radio [field value label]
   [:label [input/radio field value] label])
 
+(defcard-rg no-validation
+  (defn my-form []
+    (let [form  (form/create-form {:value "value"})
+          field (form/field form [:value])]
+      (fn []
+        [:form {:on-submit (handler/handle-valid-form form #(prn "Changed form value is" %))}
+         [:label
+          "Value:"
+          [input/input field]]])))
+  {})
+
+(defcard-rg field-validation
+  (fn []
+    (let [form  (form/create-form {:value 1})
+          field (form/field form [:value] :int)]
+      (fn []
+        [:form {:on-submit (handler/handle-valid-form form #(prn "Changed form value is" %))}
+         [:label
+          "Value:"
+          [input/input field {:type  "text"
+                              :style (when-not @(form/valid? field)
+                                       {:border "1px solid red"})}]]])))
+  {})
+
+(defcard-rg form-validation
+  (fn []
+    (let [form  (form/create-form {:value 1} (struct-validator {:value [st/required]}))
+          field (form/field form [:value])]
+      (fn []
+        [:form {:on-submit (handler/handle-valid-form form #(prn "Changed form value is" %))}
+         [:label
+          "Value:"
+          [input/input field {:type  "text"
+                              :style (when-not @(form/valid? field)
+                                       {:border "1px solid red"})}]]])))
+  {})
+
 (defcard-rg rg-form
   (fn [state]
     (let [form      (form/create-form
@@ -54,11 +89,12 @@
           int-field (form/field form [:int-field] :int)]
       (fn [state]
 
-        [:form {:on-submit (form/handle-valid-form form
+        [:form {:on-submit (handler/handle-valid-form form
                                                    #(reset! state @(form/value form {})))}
          [:div "Valid?:" (if @(form/valid? form) "T" "F")]
          [my-field "text" (form/field form [:field] :text)]
          [my-field "text" (form/field form [:int-field] :int)]
+         [my-field "text" (form/field form [:number-field] :number)]
          [my-checkbox (form/field form [:bool-field] :bool)]
          [:div
           [input/select int-field {}
@@ -70,7 +106,7 @@
             [:option {:value 2} "2"]]]
           [:select
            {:value     @(form/str-value int-field)
-            :on-change (form/handle-str-value int-field)}
+            :on-change (handler/handle-str-value int-field)}
            [:option {:value 1} "1"]
            [:option {:value 2} "2"]]]
          [:div
@@ -80,16 +116,17 @@
 
          [:input {:type "submit"}]
          [:input {:type "button" :on-click #(form/reset-value! form) :value "Reset"}]
-         [:input {:type "button"
+         [:input {:type     "button"
                   :on-click #(form/set-error! int-field "Error")
-                  :value "Set error"}]
-         [:input {:type "button"
+                  :value    "Set error"}]
+         [:input {:type     "button"
                   :on-click #(form/clear-error! int-field)
-                  :value "Clear error"}]
+                  :value    "Clear error"}]
          ])))
-  {:field      "value"
-   :int-field  1
-   :bool-field true}
+  {:field        "value"
+   :int-field    1
+   :bool-field   true
+   :number-field 5.4}
 
   {:inspect-data true}
   )
@@ -112,8 +149,8 @@
         (is @(form/valid? int-field))))
 
     (testing "int coercer"
-      (is (form/valid-str? :int "1"))
-      (is (not (form/valid-str? :int "invalid"))))
+      (is (coerce/valid-str? :int "1"))
+      (is (not (coerce/valid-str? :int "invalid"))))
 
 
     (testing "change"
