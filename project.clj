@@ -24,7 +24,7 @@
 
                    :cljsbuild      {:builds [{:id           "devcards"
                                               :source-paths ["src" "dev/cljs"]
-                                              :figwheel     {:devcards true}      ;; <- note this
+                                              :figwheel     {:devcards true} ;; <- note this
                                               :compiler     {:main                 "re-frame-forms.cards"
                                                              :asset-path           "js/compiled/devcards_out"
                                                              :output-to            "dev/resources/public/js/compiled/re_frame_forms_devcards.js"
