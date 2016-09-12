@@ -20,8 +20,8 @@
 
 (defn struct-validator [schema]
   (validation/form-validator #(validation/validation-result
-                    (-> (st/validate % schema)
-                        first))))
+                               (-> (st/validate % schema)
+                                   first))))
 
 (defn my-field [type field]
   (fn [type field]
@@ -45,8 +45,8 @@
 
 (defcard-rg no-validation
   (defn my-form []
-    (let [form  (form/create-form {:value "value"})
-          field (form/field form [:value])]
+    (let [form  (form/make-form {:value "value"})
+          field (form/make-field form [:value])]
       (fn []
         [:form {:on-submit (handler/handle-valid-form form #(prn "Changed form value is" %))}
          [:label
@@ -56,8 +56,8 @@
 
 (defcard-rg field-validation
   (fn []
-    (let [form  (form/create-form {:value 1})
-          field (form/field form [:value] :int)]
+    (let [form  (form/make-form {:value 1})
+          field (form/make-field form [:value] :int)]
       (fn []
         [:form {:on-submit (handler/handle-valid-form form #(prn "Changed form value is" %))}
          [:label
@@ -69,8 +69,8 @@
 
 (defcard-rg form-validation
   (fn []
-    (let [form  (form/create-form {:value 1} (struct-validator {:value [st/required]}))
-          field (form/field form [:value])]
+    (let [form  (form/make-form {:value 1} (struct-validator {:value [st/required]}))
+          field (form/make-field form [:value])]
       (fn []
         [:form {:on-submit (handler/handle-valid-form form #(prn "Changed form value is" %))}
          [:label
@@ -82,20 +82,20 @@
 
 (defcard-rg rg-form
   (fn [state]
-    (let [form      (form/create-form
+    (let [form      (form/make-form
                       @state
                       (struct-validator {:field     [st/required st/string]
                                          :int-field [st/required st/integer]}))
-          int-field (form/field form [:int-field] :int)]
+          int-field (form/make-field form [:int-field] :int)]
       (fn [state]
 
         [:form {:on-submit (handler/handle-valid-form form
-                                                   #(reset! state @(form/value form {})))}
+                                                      #(reset! state @(form/value form {})))}
          [:div "Valid?:" (if @(form/valid? form) "T" "F")]
-         [my-field "text" (form/field form [:field] :text)]
-         [my-field "text" (form/field form [:int-field] :int)]
-         [my-field "text" (form/field form [:number-field] :number)]
-         [my-checkbox (form/field form [:bool-field] :bool)]
+         [my-field "text" (form/make-field form [:field] :text)]
+         [my-field "text" (form/make-field form [:int-field] :int)]
+         [my-field "text" (form/make-field form [:number-field] :number)]
+         [my-checkbox (form/make-field form [:bool-field] :bool)]
          [:div
           [input/select int-field {}
            (input/options 1 "1"
@@ -134,12 +134,12 @@
 (deftest test-form
   (testing "form without validator"
     (testing "display"
-      (let [form       (form/create-form {:field     "value"
+      (let [form       (form/make-form {:field       "value"
                                           :int-field 1})
-            text-field (form/field form [:field] :text)
-            int-field  (form/field form [:int-field] :int)]
-        (is (= @(form/value form nil) {:field     "value"
-                                       :int-field 1}))
+            text-field (form/make-field form [:field] :text)
+            int-field  (form/make-field form [:int-field] :int)]
+        (is (= @(form/value form) {:field     "value"
+                                   :int-field 1}))
         (is (= @(form/value text-field) "value"))
         (is (= @(form/str-value text-field) "value"))
         (is @(form/valid? text-field))
@@ -154,10 +154,10 @@
 
 
     (testing "change"
-      (let [form       (form/create-form {:field     "value"
+      (let [form       (form/make-form {:field       "value"
                                           :int-field 1})
-            text-field (form/field form [:field] :text)
-            int-field  (form/field form [:int-field] :int)
+            text-field (form/make-field form [:field] :text)
+            int-field  (form/make-field form [:int-field] :int)
             ]
         (testing "set changed as str value"
           (form/set-str-value! text-field "changed")
@@ -171,8 +171,8 @@
           (is (not @(form/valid? int-field)) "invalid, is not valid int")))))
 
   (testing "form with validator, int in range <1;2>"
-    (let [form      (form/create-form {:value 1} (struct-validator {:value [[st/in-range 1 2]]}))
-          int-field (form/field form [:value] :int)]
+    (let [form      (form/make-form {:value 1} (struct-validator {:value [[st/in-range 1 2]]}))
+          int-field (form/make-field form [:value] :int)]
       (is @(form/valid? int-field) "1 is in range <1;2")
 
 
