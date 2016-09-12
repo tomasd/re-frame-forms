@@ -84,3 +84,16 @@
    (make-form value nil))
   ([value validator]
    (impl/make-form value validator)))
+
+(defn handle-str-value [field]
+  #(set-str-value! field (-> % .-target .-value)))
+
+(defn handle-checked-value [field]
+  #(set-value! field (-> % .-target .-checked)))
+
+(defn handle-valid-form [form callback]
+  (fn [e]
+    (touch! form)
+    (when @(valid? form)
+      (callback @(value form)))
+    (.preventDefault e)))

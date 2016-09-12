@@ -39,25 +39,25 @@
   (from-str [_ s] (keyword s))
   (valid-str? [_ s] (not (str/blank? s))))
 
-(defmulti create-coercer identity)
+(defmulti make-coercer identity)
 
-(defmethod create-coercer :default
+(defmethod make-coercer :default
   [_] (reify
         Coercer
         (to-str [_ obj] (str obj))
         (from-str [_ s] s)
         (valid-str? [_ _] true)
         ))
-(defmethod create-coercer :int
+(defmethod make-coercer :int
   [_] (->IntCoercer true))
-(defmethod create-coercer :number
+(defmethod make-coercer :number
   [_] (->NumberCoercer true))
-(defmethod create-coercer :keyword
+(defmethod make-coercer :keyword
   [_] (->KeywordCoercer))
-(defmethod create-coercer :bool
+(defmethod make-coercer :bool
   [_] (->BoolCoercer true))
 
-(def ->coercer (memoize create-coercer))
+(def ->coercer (memoize make-coercer))
 (extend-type Keyword
   Coercer
   (to-str [this obj-value]

@@ -160,7 +160,7 @@
 (defn make-field [form path type validator]
   (let [coercer (if (instance? coerce/Coercer type)
                   type
-                  (coerce/create-coercer type))]
+                  (coerce/make-coercer type))]
     (->Field form coercer validator path)))
 
 (defn make-form [value validator]

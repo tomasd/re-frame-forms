@@ -1,7 +1,6 @@
 (ns re-frame-forms.input
   (:require
-    [re-frame-forms.core :as form]
-    [re-frame-forms.handler :as handler]))
+    [re-frame-forms.core :as form]))
 
 (defn radio
   ([field value]
@@ -11,7 +10,7 @@
      [:input (merge attrs
                     {:type      "radio"
                      :value     value
-                     :on-change (handler/handle-str-value field)
+                     :on-change (form/handle-str-value field)
                      :checked   (= @(form/value field) value)})])))
 
 (defn checkbox
@@ -22,7 +21,7 @@
      [:input (merge attrs
                     {:type      "checkbox"
                      :checked   @(form/value field)
-                     :on-change (handler/handle-checked-value field)})])))
+                     :on-change (form/handle-checked-value field)})])))
 
 (defn input
   ([field]
@@ -31,7 +30,7 @@
    (fn [field attrs]
      [:input (merge attrs
                     {:value     @(form/str-value field)
-                     :on-change (handler/handle-str-value field)})])))
+                     :on-change (form/handle-str-value field)})])))
 
 
 (defn select
@@ -40,7 +39,7 @@
      (into [:select
             (merge attrs
                    {:value     @(form/str-value field)
-                    :on-change (handler/handle-str-value field)})]
+                    :on-change (form/handle-str-value field)})]
            options))))
 
 (defn options [& options]

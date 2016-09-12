@@ -5,7 +5,6 @@
     [re-frame-forms.core :as form]
     [re-frame-forms.input :as input]
     [re-frame-forms.coerce :as coerce]
-    [re-frame-forms.handler :as handler]
     [re-frame-forms.validation :as validation]
     [reagent.core :as reagent]
     [struct.core :as st]
@@ -48,7 +47,7 @@
     (let [form  (form/make-form {:value "value"})
           field (form/make-field form [:value])]
       (fn []
-        [:form {:on-submit (handler/handle-valid-form form #(prn "Changed form value is" %))}
+        [:form {:on-submit (form/handle-valid-form form #(prn "Changed form value is" %))}
          [:label
           "Value:"
           [input/input field]]])))
@@ -59,7 +58,7 @@
     (let [form  (form/make-form {:value 1})
           field (form/make-field form [:value] :int)]
       (fn []
-        [:form {:on-submit (handler/handle-valid-form form #(prn "Changed form value is" %))}
+        [:form {:on-submit (form/handle-valid-form form #(prn "Changed form value is" %))}
          [:label
           "Value:"
           [input/input field {:type  "text"
@@ -72,7 +71,20 @@
     (let [form  (form/make-form {:value 1} (struct-validator {:value [st/required]}))
           field (form/make-field form [:value])]
       (fn []
-        [:form {:on-submit (handler/handle-valid-form form #(prn "Changed form value is" %))}
+        [:form {:on-submit (form/handle-valid-form form #(prn "Changed form value is" %))}
+         [:label
+          "Value:"
+          [input/input field {:type  "text"
+                              :style (when-not @(form/valid? field)
+                                       {:border "1px solid red"})}]]])))
+  {})
+
+(defcard-rg external-field-validation
+  (fn []
+    (let [form  (form/make-form {:value 1} (struct-validator {:value [st/required]}))
+          field (form/make-field form [:value] )]
+      (fn []
+        [:form {:on-submit (form/handle-valid-form form #(prn "Changed form value is" %))}
          [:label
           "Value:"
           [input/input field {:type  "text"
@@ -89,7 +101,7 @@
           int-field (form/make-field form [:int-field] :int)]
       (fn [state]
 
-        [:form {:on-submit (handler/handle-valid-form form
+        [:form {:on-submit (form/handle-valid-form form
                                                       #(reset! state @(form/value form {})))}
          [:div "Valid?:" (if @(form/valid? form) "T" "F")]
          [my-field "text" (form/make-field form [:field] :text)]
@@ -106,7 +118,7 @@
             [:option {:value 2} "2"]]]
           [:select
            {:value     @(form/str-value int-field)
-            :on-change (handler/handle-str-value int-field)}
+            :on-change (form/handle-str-value int-field)}
            [:option {:value 1} "1"]
            [:option {:value 2} "2"]]]
          [:div

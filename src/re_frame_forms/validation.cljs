@@ -1,14 +1,25 @@
 (ns re-frame-forms.validation)
 
 (defprotocol FieldValidator
-  (validate-field [this value]))
+  "Validate field"
+  (validate-field
+    [this value]
+    "Return vector of errors for the field. Empty vector if valie"))
 
 (defprotocol FormValidator
-  (validate-form [this value]))
+  "Validate form"
+  (validate-form
+    [this value]
+    "Return instance of ValidationResult."))
 
 (defprotocol ValidationResult
-  (field-errors [this path])
-  (valid? [this]))
+  "Holder for validation result"
+  (field-errors
+    [this path]
+    "Get errors for the field on path")
+  (valid?
+    [this]
+    "Is this form valid?"))
 
 (deftype ValidResult []
   ValidationResult
