@@ -51,6 +51,7 @@
                                     "target"]
 
   :source-paths ["src"]
-  :lein-release {:deploy-via :clojars}
+  :lein-release {:scm        :git
+                 :deploy-via :clojars}
 
   )
