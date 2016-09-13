@@ -29,6 +29,18 @@
                          :style (if-not @(form/valid? field) {:border "1px solid red"})}]
      [:button {:type     "button"
                :on-click #(form/reset-value! field)} "Reset"]
+
+     [:button {:type     "button"
+               :on-click #(form/start-validation! field)}
+      "Start validation"]
+     [:button {:type     "button"
+               :on-click #(form/mark-ok! field)}
+      "Mark ok!"]
+     [:button {:type     "button"
+               :on-click #(form/mark-error! field "ERROR!")}
+      "Mark error!"]
+     [:span (when @(form/validation-in-progress? field)
+              "Validation in progress...")]
      [:span (form/original-value field)]
      (when @(form/touched? field) "touched")
      (if @(form/valid? field) "valid" "invalid")
@@ -82,7 +94,7 @@
 (defcard-rg external-field-validation
   (fn []
     (let [form  (form/make-form {:value 1} (struct-validator {:value [st/required]}))
-          field (form/make-field form [:value] )]
+          field (form/make-field form [:value])]
       (fn []
         [:form {:on-submit (form/handle-valid-form form #(prn "Changed form value is" %))}
          [:label
@@ -102,7 +114,7 @@
       (fn [state]
 
         [:form {:on-submit (form/handle-valid-form form
-                                                      #(reset! state @(form/value form {})))}
+                                                   #(reset! state @(form/value form {})))}
          [:div "Valid?:" (if @(form/valid? form) "T" "F")]
          [my-field "text" (form/make-field form [:field] :text)]
          [my-field "text" (form/make-field form [:int-field] :int)]
@@ -146,8 +158,8 @@
 (deftest test-form
   (testing "form without validator"
     (testing "display"
-      (let [form       (form/make-form {:field       "value"
-                                          :int-field 1})
+      (let [form       (form/make-form {:field     "value"
+                                        :int-field 1})
             text-field (form/make-field form [:field] :text)
             int-field  (form/make-field form [:int-field] :int)]
         (is (= @(form/value form) {:field     "value"
@@ -166,8 +178,8 @@
 
 
     (testing "change"
-      (let [form       (form/make-form {:field       "value"
-                                          :int-field 1})
+      (let [form       (form/make-form {:field     "value"
+                                        :int-field 1})
             text-field (form/make-field form [:field] :text)
             int-field  (form/make-field form [:int-field] :int)
             ]

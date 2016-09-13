@@ -59,3 +59,11 @@
   (touched?
     [this]
     "Get reaction with current touch status"))
+
+(defprotocol DelayedValidation
+  (start-validation! [this])
+  (mark-ok! [this])
+  (mark-error! [this error]))
+
+(defprotocol DelayValidationContainer
+  (validation-in-progress? [this]))

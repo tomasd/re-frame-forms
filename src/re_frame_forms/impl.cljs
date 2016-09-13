@@ -54,6 +54,8 @@
            ::field-errors []
            ::coercion-error false
            ::value (proto/original-value this)
+           ::persistent-error nil
+           ::delayed-validation false
            ::tmp nil
            ::field-touched false))
 
@@ -61,12 +63,12 @@
   (str-value [this]
     (reaction
       (let [str-value @(path-value form ::tmp path nil)
-            value     @(proto/value this)]
+            value     @(proto/value this nil)]
         (or str-value (coerce/to-str coercer value)))))
   (set-str-value! [this val]
     (if (coerce/valid-str? coercer val)
       (proto/set-value! this
-                  (coerce/from-str coercer val))
+                        (coerce/from-str coercer val))
       (swap! form assoc-field path
              ::field-errors (validate-field coercer val)
              ::coercion-error true
@@ -99,7 +101,24 @@
     (reaction
       (let [form-touched @(proto/touched? form)
             path-touched @(path-value form ::field-touched path false)]
-        (or form-touched path-touched)))))
+        (or form-touched path-touched))))
+
+  proto/DelayedValidation
+  (start-validation! [_]
+    (swap! form assoc-field path ::delayed-validation true))
+
+  (mark-ok! [_]
+    (swap! form assoc-field path
+           ::persistent-error nil
+           ::delayed-validation false))
+  (mark-error! [_ error]
+    (swap! form assoc-field path
+           ::persistent-error error
+           ::delayed-validation false))
+
+  proto/DelayValidationContainer
+  (validation-in-progress? [_]
+    (reaction @(path-value form ::delayed-validation path false))))
 
 (defn- validate-form
   ([validator f]
@@ -109,6 +128,13 @@
    (let [new-value (apply f value args)]
      (-> new-value
          (assoc ::validator-errors (validation/validate-form validator (::value new-value)))))))
+
+(defn- validation-in-progress? [form-value]
+  (->> (::delayed-validation form-value {})
+       vals
+       (filter true?)
+       not-empty)
+  )
 
 (defrecord Form [value validator]
   ISwap
@@ -149,13 +175,18 @@
                      vals
                      (remove empty?)
                      empty?)
-                (validation/valid? (::validator-errors @value)))))
+                (validation/valid? (::validator-errors @value))
+                (not (validation-in-progress? @value)))))
 
   proto/Touchable
   (touch! [_]
     (swap! value assoc ::form-touched true))
   (touched? [_]
-    (reaction (::form-touched @value false))))
+    (reaction (::form-touched @value false)))
+
+  proto/DelayValidationContainer
+  (validation-in-progress? [_]
+    (reaction (validation-in-progress? @value) )))
 
 (defn make-field [form path type validator]
   (let [coercer (if (instance? coerce/Coercer type)
@@ -164,6 +195,6 @@
     (->Field form coercer validator path)))
 
 (defn make-form [value validator]
-  (->Form (reagent/atom {::value         value
-                              ::original value})
-               validator))
+  (->Form (reagent/atom {::value    value
+                         ::original value})
+          validator))

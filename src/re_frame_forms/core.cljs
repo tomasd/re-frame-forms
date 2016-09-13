@@ -29,6 +29,15 @@
   [field]
   (set-error! field nil))
 
+(defn start-validation! [this]
+  (proto/start-validation! this))
+(defn validation-in-progress? [this]
+  (proto/validation-in-progress? this))
+(defn mark-ok! [this]
+  (proto/mark-ok! this))
+(defn mark-error! [this error]
+  (proto/mark-error! this error))
+
 
 (defn original-value
   "Get original value of the form/field"
