@@ -9,7 +9,7 @@
                  [org.clojure/clojurescript "1.9.229"]
 
                  [cljsjs/react "15.2.1-0"]
-                 [reagent "0.6.0-rc"]]
+                 [reagent "0.6.0"]]
 
   :profiles {:dev {:dependencies   [[devcards "0.2.1-7"]
                                     [funcool/struct "1.0.0"]]
