@@ -109,9 +109,9 @@
    (fn [value]
      (parse-date pattern value)))
   ([pattern d]
-   (let [date (js/Date.)]
+   (let [date (js/Date. 0)]
      (if-not (= 0 (.strictParse (make-datetime-parser pattern) d date))
-       (do (prn date (.getYear date) (> (.getYear date) 1000)) (if (> (.getYear date) -900)
-             date
-             nil))
+       (if (> (.getYear date) -900)
+         date
+         nil)
        nil))))

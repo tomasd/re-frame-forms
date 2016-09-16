@@ -67,7 +67,9 @@
         (or str-value (coerce/to-str coercer value)))))
   (set-str-value! [this val retain-str?]
     (if (coerce/valid-str? coercer val)
-      (let [obj-value (coerce/from-str coercer val)]
+      (let [obj-value (->> (coerce/from-str coercer val)
+                           (coerce/to-str coercer)
+                           (coerce/from-str coercer))]
         (swap! form assoc-field path
                ::field-errors (validation/validate-field validator obj-value)
                ::coercion-error false
