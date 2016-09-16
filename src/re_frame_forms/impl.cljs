@@ -65,10 +65,15 @@
       (let [str-value @(path-value form ::tmp path nil)
             value     @(proto/value this nil)]
         (or str-value (coerce/to-str coercer value)))))
-  (set-str-value! [this val]
+  (set-str-value! [this val retain-str?]
     (if (coerce/valid-str? coercer val)
-      (proto/set-value! this
-                        (coerce/from-str coercer val))
+      (let [obj-value (coerce/from-str coercer val)]
+        (swap! form assoc-field path
+               ::field-errors (validation/validate-field validator obj-value)
+               ::coercion-error false
+               ::value obj-value
+               ::tmp (when retain-str? val)
+               ::field-touched true))
       (swap! form assoc-field path
              ::field-errors (validate-field coercer val)
              ::coercion-error true
@@ -186,7 +191,7 @@
 
   proto/DelayValidationContainer
   (validation-in-progress? [_]
-    (reaction (validation-in-progress? @value) )))
+    (reaction (validation-in-progress? @value))))
 
 (defn make-field [form path coercer validator]
   (->Field form coercer validator path))

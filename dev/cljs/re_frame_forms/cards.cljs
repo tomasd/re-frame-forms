@@ -8,14 +8,29 @@
     [re-frame-forms.validation :as validation]
     [reagent.core :as reagent]
     [struct.core :as st]
-    [cuerdas.core :as str])
+    [cuerdas.core :as str]
+    [re-frame-forms.format :as fmt])
   (:require-macros
     [devcards.core :as dc :refer [defcard deftest defcard-rg]]
     [reagent.ratom :refer [reaction]]
     [cljs.test :refer [testing is]]
     ))
+(fmt/set-locale! "sk")
 
 (enable-console-print!)
+
+(deftest format-test
+  (testing "int format"
+    (is (= "12" (fmt/format-int 12.34567)))
+    (is (= "1 234 567" (fmt/format-int 1234567))))
+
+  (testing "number format"
+    (is (= "12,346" (fmt/format-decimal 12.34567)))
+    (is (= "1 234 567,346" (fmt/format-decimal 1234567.34567))))
+
+  (testing "currency format"
+    (is (= "12,35 €" (fmt/format-currency 12.34567)))
+    (is (= "1 234 567,35 €" (fmt/format-currency 1234567.34567)))))
 
 (defn struct-validator [schema]
   (validation/form-validator #(validation/validation-result
@@ -119,6 +134,7 @@
          [my-field "text" (form/make-field form [:field])]
          [my-field "text" (form/make-field form [:int-field] (coerce/int))]
          [my-field "text" (form/make-field form [:number-field] (coerce/number))]
+         [my-field "text" (form/make-field form [:date-field] (coerce/date "dd.MM.yyyy"))]
          [my-checkbox (form/make-field form [:bool-field] (coerce/bool))]
          [:div
           [input/select int-field {}

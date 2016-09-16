@@ -55,8 +55,10 @@
   (proto/str-value field))
 (defn set-str-value!
   "Set current value by converting val from string"
-  [field value]
-  (proto/set-str-value! field value))
+  ([field value]
+   (proto/set-str-value! field value false))
+  ([field value retain-str?]
+   (proto/set-str-value! field value retain-str?)))
 
 
 (defn errors
@@ -94,8 +96,11 @@
   ([value validator]
    (impl/make-form value validator)))
 
-(defn handle-str-value [field]
-  #(set-str-value! field (-> % .-target .-value)))
+(defn handle-str-value
+  ([field]
+    (handle-str-value field false))
+  ([field retain-str?]
+   #(set-str-value! field (-> % .-target .-value) retain-str?)))
 
 (defn handle-checked-value [field]
   #(set-value! field (-> % .-target .-checked)))

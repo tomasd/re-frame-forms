@@ -30,7 +30,8 @@
    (fn [field attrs]
      [:input (merge attrs
                     {:value     @(form/str-value field)
-                     :on-change (form/handle-str-value field)})])))
+                     :on-change (form/handle-str-value field true)
+                     :on-blur (form/handle-str-value field false)})])))
 
 
 (defn select

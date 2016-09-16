@@ -36,7 +36,7 @@
     [this]
     "Get reaction for current value converted to string")
   (set-str-value!
-    [this val]
+    [this val retain-str?]
     "Set current value by converting val from string"))
 
 (defprotocol ErrorContainer
