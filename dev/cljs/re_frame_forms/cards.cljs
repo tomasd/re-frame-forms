@@ -68,7 +68,7 @@
 (defcard-rg field-validation
   (fn []
     (let [form  (form/make-form {:value 1})
-          field (form/make-field form [:value] :int)]
+          field (form/make-field form [:value] (coerce/int))]
       (fn []
         [:form {:on-submit (form/handle-valid-form form #(prn "Changed form value is" %))}
          [:label
@@ -110,16 +110,16 @@
                       @state
                       (struct-validator {:field     [st/required st/string]
                                          :int-field [st/required st/integer]}))
-          int-field (form/make-field form [:int-field] :int)]
+          int-field (form/make-field form [:int-field] (coerce/int))]
       (fn [state]
 
         [:form {:on-submit (form/handle-valid-form form
                                                    #(reset! state @(form/value form {})))}
          [:div "Valid?:" (if @(form/valid? form) "T" "F")]
-         [my-field "text" (form/make-field form [:field] :text)]
-         [my-field "text" (form/make-field form [:int-field] :int)]
-         [my-field "text" (form/make-field form [:number-field] :number)]
-         [my-checkbox (form/make-field form [:bool-field] :bool)]
+         [my-field "text" (form/make-field form [:field])]
+         [my-field "text" (form/make-field form [:int-field] (coerce/int))]
+         [my-field "text" (form/make-field form [:number-field] (coerce/number))]
+         [my-checkbox (form/make-field form [:bool-field] (coerce/bool))]
          [:div
           [input/select int-field {}
            (input/options 1 "1"
@@ -143,9 +143,9 @@
          [:input {:type     "button"
                   :on-click #(form/set-error! int-field "Error")
                   :value    "Set error"}]
-         [:input {:type     "button"
-                  :on-click #(form/clear-error! int-field)
-                  :value    "Clear error"}]
+        [:input {:type     "button"
+                 :on-click #(form/clear-error! int-field)
+                 :value    "Clear error"}]
          ])))
   {:field        "value"
    :int-field    1
@@ -160,8 +160,8 @@
     (testing "display"
       (let [form       (form/make-form {:field     "value"
                                         :int-field 1})
-            text-field (form/make-field form [:field] :text)
-            int-field  (form/make-field form [:int-field] :int)]
+            text-field (form/make-field form [:field])
+            int-field  (form/make-field form [:int-field] (coerce/int))]
         (is (= @(form/value form) {:field     "value"
                                    :int-field 1}))
         (is (= @(form/value text-field) "value"))
@@ -172,16 +172,11 @@
         (is (= @(form/str-value int-field) "1"))
         (is @(form/valid? int-field))))
 
-    (testing "int coercer"
-      (is (coerce/valid-str? :int "1"))
-      (is (not (coerce/valid-str? :int "invalid"))))
-
-
     (testing "change"
       (let [form       (form/make-form {:field     "value"
                                         :int-field 1})
-            text-field (form/make-field form [:field] :text)
-            int-field  (form/make-field form [:int-field] :int)
+            text-field (form/make-field form [:field])
+            int-field  (form/make-field form [:int-field] (coerce/int))
             ]
         (testing "set changed as str value"
           (form/set-str-value! text-field "changed")
@@ -196,7 +191,7 @@
 
   (testing "form with validator, int in range <1;2>"
     (let [form      (form/make-form {:value 1} (struct-validator {:value [[st/in-range 1 2]]}))
-          int-field (form/make-field form [:value] :int)]
+          int-field (form/make-field form [:value] (coerce/int))]
       (is @(form/valid? int-field) "1 is in range <1;2")
 
 

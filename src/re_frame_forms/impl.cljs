@@ -188,11 +188,8 @@
   (validation-in-progress? [_]
     (reaction (validation-in-progress? @value) )))
 
-(defn make-field [form path type validator]
-  (let [coercer (if (instance? coerce/Coercer type)
-                  type
-                  (coerce/make-coercer type))]
-    (->Field form coercer validator path)))
+(defn make-field [form path coercer validator]
+  (->Field form coercer validator path))
 
 (defn make-form [value validator]
   (->Form (reagent/atom {::value    value
