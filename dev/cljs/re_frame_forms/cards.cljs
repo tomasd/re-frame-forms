@@ -15,7 +15,13 @@
     [reagent.ratom :refer [reaction]]
     [cljs.test :refer [testing is]]
     ))
-(fmt/set-locale! "sk")
+(defn set-locale! [locale]
+  (set! goog.i18n.NumberFormatSymbols (aget goog.i18n (str "NumberFormatSymbols_" locale)))
+  (set! goog.LOCALE locale))
+
+(set-locale! "sk")
+
+
 
 (enable-console-print!)
 
