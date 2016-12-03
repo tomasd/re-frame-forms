@@ -1,4 +1,4 @@
-(defproject re-frame-forms "0.1.3-SNAPSHOT"
+(defproject re-frame-forms "0.1.3"
   :description "Reagent library for form processing"
   :url "https://github.com/tomasd/re-frame-forms"
   :license {:name "MIT"}
