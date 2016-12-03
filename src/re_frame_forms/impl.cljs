@@ -157,15 +157,15 @@
   proto/Value
   (value [_ default]
     (reaction (get @value ::value default)))
-  (set-value! [_ val]
-    (swap! value
+  (set-value! [this val]
+    (swap! this
            validate-form assoc ::value val))
 
   proto/ResetValue
   (original-value [_]
     (get @value ::original))
-  (reset-value! [_]
-    (swap! value (fn [value]
+  (reset-value! [this]
+    (swap! this (fn [value]
                    {::value    (::original value)
                     ::original (::original value)})))
 
@@ -186,8 +186,8 @@
                 (not (validation-in-progress? @value)))))
 
   proto/Touchable
-  (touch! [_]
-    (swap! value assoc ::form-touched true))
+  (touch! [this]
+    (swap! this assoc ::form-touched true))
   (touched? [_]
     (reaction (::form-touched @value false)))
 

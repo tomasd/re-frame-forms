@@ -34,8 +34,8 @@
 
 (defn struct-validator [schema]
   (validation/form-validator #(validation/validation-result
-                               (-> (st/validate % schema)
-                                   first))))
+                                (-> (st/validate % schema)
+                                    first))))
 
 (defn my-field [type field]
   (fn [type field]
@@ -124,6 +124,7 @@
     (let [form      (form/make-form
                       @state
                       (struct-validator {:field     [st/required st/string]
+                                         :other     [st/required]
                                          :int-field [st/required st/integer]}))
           int-field (form/make-field form [:int-field] (coerce/int))]
       (fn [state]
@@ -135,6 +136,7 @@
          [my-field "text" (form/make-field form [:int-field] (coerce/int))]
          [my-field "text" (form/make-field form [:number-field] (coerce/number))]
          [my-field "text" (form/make-field form [:date-field] (coerce/date "dd.MM.yyyy"))]
+         [my-field "text" (form/make-field form [:other])]
          [my-checkbox (form/make-field form [:bool-field] (coerce/bool))]
          [:div
           [input/select int-field {}
@@ -159,9 +161,9 @@
          [:input {:type     "button"
                   :on-click #(form/set-error! int-field "Error")
                   :value    "Set error"}]
-        [:input {:type     "button"
-                 :on-click #(form/clear-error! int-field)
-                 :value    "Clear error"}]
+         [:input {:type     "button"
+                  :on-click #(form/clear-error! int-field)
+                  :value    "Clear error"}]
          ])))
   {:field        "value"
    :int-field    1
